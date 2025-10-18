@@ -20,3 +20,5 @@ All notable changes to this project will be documented in this file.
 - Controller helpers:
   - current_whop_user_id, require_whop_user!, current_whop_user
 - README updated with examples for new namespaces
+ - Iframe helper added: `Whop::IframeHelper#whop_iframe_sdk_tags` renders UMD script + inline init and an ESM fallback (import from esm.sh) with DOMContentLoaded and turbo:load hooks
+ - Installer CSP expanded to allow unpkg.com, esm.sh, and whop.com domains for scripts, connect, and frames

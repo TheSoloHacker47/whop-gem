@@ -118,13 +118,18 @@ curl -i -X POST http://localhost:3000/whop/webhooks \
 ## Using the client
 # Frontend (iframe) helper
 
-Add the SDK tags in your layout head:
+Add the SDK tags in your layout head (includes UMD + ESM fallback and turbo:load re-init):
 
 ```erb
 <%= extend(Whop::IframeHelper) && whop_iframe_sdk_tags %>
 ```
 
 Ensure your CSP allows Whop domains; the installer adds `config/initializers/whop_iframe.rb` with sensible defaults (script/connect/frame to unpkg.com, esm.sh, whop.com/*).
+If you prefer not to expose `WHOP_APP_ID` to the layout, add it to body:
+
+```erb
+<body data-whop-app-id="<%= ENV['WHOP_APP_ID'] %>">
+```
 
 
 ```ruby
