@@ -2,9 +2,9 @@ require_relative "dsl"
 
 Whop::DSL.define do
   resource :access do
-    graphql :check_if_user_has_access_to_experience, operation: "CheckIfUserHasAccessToExperience", args: %i[userId experienceId]
-    graphql :check_if_user_has_access_to_access_pass, operation: "CheckIfUserHasAccessToAccessPass", args: %i[userId accessPassId]
-    graphql :check_if_user_has_access_to_company, operation: "CheckIfUserHasAccessToCompany", args: %i[userId companyId]
+    graphql :check_if_user_has_access_to_experience, operation: "checkIfUserHasAccessToExperience", args: %i[userId experienceId]
+    graphql :check_if_user_has_access_to_access_pass, operation: "checkIfUserHasAccessToAccessPass", args: %i[userId accessPassId]
+    graphql :check_if_user_has_access_to_company, operation: "checkIfUserHasAccessToCompany", args: %i[userId companyId]
   end
 
   resource :users do

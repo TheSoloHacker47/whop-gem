@@ -12,6 +12,11 @@ Gem::Specification.new do |spec|
 
   spec.required_ruby_version = ">= 3.2"
   spec.homepage      = "https://github.com/TheSoloHacker47/whop-gem"
+  spec.metadata = {
+    "source_code_uri" => "https://github.com/TheSoloHacker47/whop-gem",
+    "changelog_uri"   => "https://github.com/TheSoloHacker47/whop-gem/blob/main/CHANGELOG.md",
+    "documentation_uri" => "https://gemdocs.org/gems/whop/"
+  }
 
   spec.files = Dir.chdir(File.expand_path(__dir__)) do
     Dir["lib/**/*", "config/routes.rb", "README.md", "LICENSE", "examples/**/*"]
@@ -33,11 +38,7 @@ Gem::Specification.new do |spec|
 
 
 
-spec.metadata = {
-  "source_code_uri" => "https://github.com/TheSoloHacker47/whop-gem",
-  "changelog_uri"   => "https://github.com/TheSoloHacker47/whop-gem/blob/main/CHANGELOG.md",
-  "documentation_uri" => "https://gemdocs.org/gems/whop/"
-}
+  
 end
 
 

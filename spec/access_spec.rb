@@ -6,12 +6,12 @@ RSpec.describe Whop::Access do
 
   it "extracts hasAccess true from graphql payload" do
     payload = { "data" => { "hasAccessToExperience" => { "hasAccess" => true } } }
-    expect(client).to receive(:graphql).and_return(payload)
+    expect(client).to receive(:graphql_query).and_return(payload)
     expect(access.user_has_access_to_experience?(user_id: "u", experience_id: "e")).to be true
   end
 
   it "returns false when missing" do
-    expect(client).to receive(:graphql).and_return({ "data" => {} })
+    expect(client).to receive(:graphql_query).and_return({ "data" => {} })
     expect(access.user_has_access_to_access_pass?(user_id: "u", access_pass_id: "p")).to be false
   end
 end

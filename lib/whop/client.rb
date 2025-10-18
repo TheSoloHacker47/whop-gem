@@ -55,6 +55,18 @@ module Whop
       end
     end
 
+    # GraphQL with inline query string (non-persisted). Useful when operationId is unavailable.
+    def graphql_query(operation_name, query_string, variables = {})
+      with_error_mapping do
+        response = Faraday.post("#{config.api_base_url}/public-graphql") do |req|
+          apply_common_headers(req.headers)
+          req.headers["Content-Type"] = "application/json"
+          req.body = JSON.generate({ operationName: operation_name, query: query_string, variables: variables })
+        end
+        parse_response!(response)
+      end
+    end
+
     # Simple GraphQL auto-pagination helper.
     # Expects a query that returns { pageInfo: { hasNextPage, endCursor }, nodes: [...] } under a known path.
     # Usage:
