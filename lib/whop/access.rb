@@ -23,13 +23,16 @@ module Whop
     private
 
     def extract_access_boolean(graphql_result)
-      if graphql_result.is_a?(Hash)
-        data = graphql_result["data"] || graphql_result
-        key = %w[hasAccessToExperience hasAccessToAccessPass hasAccessToCompany].find { |k| data.key?(k) rescue false }
-        payload = key ? data[key] : data
-        return payload["hasAccess"] if payload.is_a?(Hash) && payload.key?("hasAccess")
-      end
-      !!graphql_result
+      return false unless graphql_result.is_a?(Hash)
+      data = graphql_result["data"] || graphql_result
+      return false unless data.is_a?(Hash)
+
+      key = %w[hasAccessToExperience hasAccessToAccessPass hasAccessToCompany].find { |k| data.key?(k) rescue false }
+      payload = key ? data[key] : data
+
+      return payload["hasAccess"] if payload.is_a?(Hash) && payload.key?("hasAccess")
+      return payload if payload == true || payload == false
+      false
     end
   end
 end

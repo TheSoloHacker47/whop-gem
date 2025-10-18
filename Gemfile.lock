@@ -1,14 +1,14 @@
 PATH
   remote: .
   specs:
-    whop-rails (0.1.0)
-      activesupport (>= 7.0)
-      faraday (>= 2.9)
-      faraday-retry (>= 2.2)
-      json (>= 2.6)
-      jwt (>= 2.8)
-      rack (>= 2.2)
-      railties (>= 7.0)
+    whop (1.0.0)
+      activesupport (>= 7.0, < 9.0)
+      faraday (~> 2.9)
+      faraday-retry (~> 2.2)
+      json (~> 2.6)
+      jwt (~> 2.8)
+      rack (>= 2.2, < 4.0)
+      railties (>= 7.0, < 9.0)
 
 GEM
   remote: https://rubygems.org/
@@ -70,7 +70,7 @@ GEM
       rdoc (>= 4.0.0)
       reline (>= 0.4.2)
     json (2.15.1)
-    jwt (3.1.2)
+    jwt (2.10.2)
       base64
     logger (1.7.0)
     loofah (2.24.1)
@@ -167,8 +167,8 @@ PLATFORMS
   x86_64-linux-musl
 
 DEPENDENCIES
-  rspec (>= 3.12)
-  whop-rails!
+  rspec (~> 3.12)
+  whop!
 
 BUNDLED WITH
    2.6.6

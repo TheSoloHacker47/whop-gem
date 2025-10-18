@@ -30,6 +30,14 @@ Gem::Specification.new do |spec|
 
   # Development dependencies
   spec.add_development_dependency "rspec", "~> 3.12"
+
+
+
+spec.metadata = {
+  "source_code_uri" => "https://github.com/TheSoloHacker47/whop-gem",
+  "changelog_uri"   => "https://github.com/TheSoloHacker47/whop-gem/blob/main/CHANGELOG.md",
+  "documentation_uri" => "https://gemdocs.org/gems/whop/"
+}
 end
 
 

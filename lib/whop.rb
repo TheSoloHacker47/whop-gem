@@ -34,6 +34,9 @@ module Whop
   end
 end
 
+# Ensure core client constant is available when requiring the gem
+require_relative "whop/client"
+
 if defined?(Rails)
   require_relative "whop/webhooks/engine"
 end
@@ -47,5 +50,8 @@ require_relative "whop/webhooks/signature"
 # Load controller helpers so apps can include Whop::ControllerHelpers
 require_relative "whop/token"
 require_relative "whop/controller_helpers"
+
+# Load access helpers (used by specs and controller helpers)
+require_relative "whop/access"
 
 

@@ -25,28 +25,56 @@ module Whop
 
     # REST helpers
     def get(path, params: nil)
-      response = connection.get(path) do |req|
-        req.params.update(params) if params
+      with_error_mapping do
+        response = connection.get(path) do |req|
+          req.params.update(params) if params
+        end
+        parse_response!(response)
       end
-      parse_response!(response)
     end
 
     def post(path, json: nil)
-      response = connection.post(path) do |req|
-        req.headers["Content-Type"] = "application/json"
-        req.body = JSON.generate(json) if json
+      with_error_mapping do
+        response = connection.post(path) do |req|
+          req.headers["Content-Type"] = "application/json"
+          req.body = JSON.generate(json) if json
+        end
+        parse_response!(response)
       end
-      parse_response!(response)
     end
 
     # GraphQL (persisted operations by operationName)
     def graphql(operation_name, variables = {})
-      response = Faraday.post("#{config.api_base_url}/public-graphql") do |req|
-        apply_common_headers(req.headers)
-        req.headers["Content-Type"] = "application/json"
-        req.body = JSON.generate({ operationName: operation_name, variables: variables })
+      with_error_mapping do
+        response = Faraday.post("#{config.api_base_url}/public-graphql") do |req|
+          apply_common_headers(req.headers)
+          req.headers["Content-Type"] = "application/json"
+          req.body = JSON.generate({ operationName: operation_name, variables: variables })
+        end
+        parse_response!(response)
       end
-      parse_response!(response)
+    end
+
+    # Simple GraphQL auto-pagination helper.
+    # Expects a query that returns { pageInfo: { hasNextPage, endCursor }, nodes: [...] } under a known path.
+    # Usage:
+    #   Whop.client.graphql_each_page("listReceiptsForCompany", { companyId: "biz" }, path: ["company", "receipts"]) { |node| ... }
+    def graphql_each_page(operation_name, variables, path:, first: 50, &block)
+      raise ArgumentError, "path must be an Array of keys" unless path.is_a?(Array) && !path.empty?
+      cursor = nil
+      loop do
+        page_vars = variables.merge({ first: first })
+        page_vars[:after] = cursor if cursor
+        data = graphql(operation_name, page_vars)
+        segment = dig_hash(data, "data", *path)
+        break unless segment.is_a?(Hash)
+        nodes = segment["nodes"] || []
+        nodes.each { |n| yield n } if block_given?
+        page_info = segment["pageInfo"] || {}
+        break unless page_info["hasNextPage"]
+        cursor = page_info["endCursor"]
+      end
+      nil
     end
 
     # Resources
@@ -86,8 +114,9 @@ module Whop
     def parse_response!(response)
       body = response.body
       json = parse_body_safely(body)
-      if response.status.to_i >= 400
-        raise Error, "Whop API error (#{response.status}): #{json.inspect}"
+      status = response.status.to_i
+      if status >= 400
+        raise map_status_error(status, json)
       end
       json
     end
@@ -163,13 +192,59 @@ module Whop
 
     def extract_access_boolean(graphql_result)
       # Attempt to locate the access payload; tolerate schema variants
-      if graphql_result.is_a?(Hash)
-        data = graphql_result["data"] || graphql_result
-        key = %w[hasAccessToExperience hasAccessToAccessPass hasAccessToCompany].find { |k| data.key?(k) rescue false }
-        payload = key ? data[key] : data
-        return payload["hasAccess"] if payload.is_a?(Hash) && payload.key?("hasAccess")
+      return false unless graphql_result.is_a?(Hash)
+      data = graphql_result["data"] || graphql_result
+      return false unless data.is_a?(Hash)
+
+      key = %w[hasAccessToExperience hasAccessToAccessPass hasAccessToCompany].find { |k| data.key?(k) rescue false }
+      payload = key ? data[key] : data
+      return payload["hasAccess"] if payload.is_a?(Hash) && payload.key?("hasAccess")
+      return payload if payload == true || payload == false
+      false
+    end
+  end
+end
+
+module Whop
+  class Client
+    private
+
+    def with_error_mapping
+      yield
+    rescue Faraday::TimeoutError => e
+      raise APITimeoutError.new("Request timed out", cause: e)
+    rescue Faraday::ConnectionFailed => e
+      raise APIConnectionError.new("Connection failed", cause: e)
+    rescue Faraday::SSLError => e
+      raise APIConnectionError.new("SSL error", cause: e)
+    rescue Faraday::Error => e
+      raise APIConnectionError.new(e.message, cause: e)
+    end
+
+    def map_status_error(status, body)
+      message = body.is_a?(String) ? body : body.inspect
+      case status.to_i
+      when 400 then BadRequestError.new(status, message, body: body)
+      when 401 then AuthenticationError.new(status, message, body: body)
+      when 403 then PermissionDeniedError.new(status, message, body: body)
+      when 404 then NotFoundError.new(status, message, body: body)
+      when 409 then ConflictError.new(status, message, body: body)
+      when 422 then UnprocessableEntityError.new(status, message, body: body)
+      when 429 then RateLimitError.new(status, message, body: body)
+      else
+        if status.to_i >= 500
+          InternalServerError.new(status, message, body: body)
+        else
+          APIStatusError.new(status, message, body: body)
+        end
       end
-      !!graphql_result
+    end
+
+    def dig_hash(obj, *keys)
+      keys.reduce(obj) do |acc, key|
+        return nil unless acc.is_a?(Hash)
+        acc[key]
+      end
     end
   end
 end
