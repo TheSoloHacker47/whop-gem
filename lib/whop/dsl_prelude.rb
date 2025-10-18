@@ -34,16 +34,100 @@ Whop::DSL.define do
   end
 
   resource :payments do
-    graphql :create_checkout_session, operation: "createCheckoutSession", args: %i[input]
-    graphql :charge_user, operation: "chargeUser", args: %i[input]
-    graphql :pay_user, operation: "payUser", args: %i[input]
-    graphql :list_receipts_for_company, operation: "listReceiptsForCompany", args: %i[companyId first after filter]
+    graphql_inline :create_checkout_session,
+      operation: "createCheckoutSession",
+      args: %i[input],
+      query: <<~GQL
+        mutation createCheckoutSession($input: CreateCheckoutSessionInput!) {
+          createCheckoutSession(input: $input) {
+            id
+            planId
+          }
+        }
+      GQL
+
+    graphql_inline :charge_user,
+      operation: "chargeUser",
+      args: %i[input],
+      query: <<~GQL
+        mutation chargeUser($input: ChargeUserInput!) {
+          chargeUser(input: $input) {
+            status
+            inAppPurchase: checkoutSession {
+              id
+              planId
+            }
+          }
+        }
+      GQL
+
+    graphql_inline :pay_user,
+      operation: "payUser",
+      args: %i[input],
+      query: <<~GQL
+        mutation payUser($input: TransferFundsInput!) {
+          transferFunds(input: $input)
+        }
+      GQL
+
+    graphql_inline :list_receipts_for_company,
+      operation: "listReceiptsForCompany",
+      args: %i[companyId first after filter],
+      query: <<~GQL
+        query listReceiptsForCompany($companyId: ID!, $first: Int, $after: String, $filter: ReceiptV2Filters) {
+          company(id: $companyId) {
+            receipts: receiptsV2(first: $first, after: $after, filter: $filter) {
+              nodes {
+                id
+                createdAt
+                finalAmount
+                currency
+              }
+              pageInfo { hasNextPage endCursor }
+            }
+          }
+        }
+      GQL
   end
 
   resource :invoices do
-    graphql :create_invoice, operation: "createInvoice", args: %i[input]
-    graphql :get_invoice, operation: "getInvoice", args: %i[invoiceId companyId]
-    graphql :list_invoices, operation: "listInvoices", args: %i[companyId after before first last]
+    graphql_inline :create_invoice,
+      operation: "createInvoice",
+      args: %i[input],
+      query: <<~GQL
+        mutation createInvoice($input: CreateInvoiceInput!) {
+          createInvoice(input: $input) {
+            invoice { id number status createdAt }
+            checkoutJobId
+          }
+        }
+      GQL
+
+    graphql_inline :get_invoice,
+      operation: "getInvoice",
+      args: %i[invoiceId companyId],
+      query: <<~GQL
+        query getInvoice($invoiceId: ID!, $companyId: ID!) {
+          company(id: $companyId) {
+            invoice(id: $invoiceId) { id number status createdAt }
+          }
+        }
+      GQL
+
+    graphql_inline :list_invoices,
+      operation: "listInvoices",
+      args: %i[companyId after before first last],
+      query: <<~GQL
+        query listInvoices($companyId: ID!, $after: String, $before: String, $first: Int, $last: Int) {
+          company(id: $companyId) {
+            invoices(after: $after, before: $before, first: $first, last: $last) {
+              totalCount
+              pageInfo { endCursor hasNextPage hasPreviousPage startCursor }
+              nodes { id number status createdAt }
+            }
+          }
+        }
+      GQL
   end
 
   resource :promo_codes do

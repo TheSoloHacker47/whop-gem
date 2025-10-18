@@ -24,6 +24,15 @@ module Whop
         @methods[method_name.to_sym] = { type: :graphql, operation: operation, args: Array(args).map(&:to_sym) }
       end
 
+      def graphql_inline(method_name, operation:, query:, args: [])
+        @methods[method_name.to_sym] = {
+          type: :graphql_inline,
+          operation: operation,
+          query: query,
+          args: Array(args).map(&:to_sym)
+        }
+      end
+
       def rest_get(method_name, path:, args: [], params: [])
         @methods[method_name.to_sym] = { type: :rest_get, path: path, args: Array(args).map(&:to_sym), params: Array(params).map(&:to_sym) }
       end
@@ -63,6 +72,9 @@ module Whop
         when :graphql
           variables = build_named_args(spec[:args], args, kwargs)
           @client.graphql(spec[:operation], variables)
+        when :graphql_inline
+          variables = build_named_args(spec[:args], args, kwargs)
+          @client.graphql_query(spec[:operation], spec[:query], variables)
         when :rest_get
           path = interpolate_path(spec[:path], build_named_args(spec[:args], args, kwargs))
           query = kwargs.select { |k, _| spec[:params].include?(k.to_sym) }

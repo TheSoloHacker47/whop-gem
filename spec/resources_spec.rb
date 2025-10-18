@@ -9,12 +9,12 @@ RSpec.describe "Whop API DSL resources" do
   end
 
   it "invokes payments.create_checkout_session with input" do
-    expect(client).to receive(:graphql).with("createCheckoutSession", { input: { planId: "plan_1" } }).and_return({})
+    expect(client).to receive(:graphql_query).with("createCheckoutSession", kind_of(String), { input: { planId: "plan_1" } }).and_return({})
     api.payments.create_checkout_session(input: { planId: "plan_1" })
   end
 
   it "invokes invoices.get_invoice with ids" do
-    expect(client).to receive(:graphql).with("getInvoice", { invoiceId: "inv_1", companyId: "biz_1" }).and_return({})
+    expect(client).to receive(:graphql_query).with("getInvoice", kind_of(String), { invoiceId: "inv_1", companyId: "biz_1" }).and_return({})
     api.invoices.get_invoice(invoiceId: "inv_1", companyId: "biz_1")
   end
 
