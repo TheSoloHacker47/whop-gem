@@ -8,7 +8,7 @@ Build Whop-embedded apps on Rails. This gem mirrors the official Next.js templat
 - Access checks (experience/company/access pass)
 - Webhooks engine with signature validation and generators
 - Rails generators for app views (Experience/Dashboard/Discover)
-- Thin HTTP + GraphQL client, with `with_company`/`with_user` scoping
+- Thin HTTP client and official REST SDK integration (`Whop.sdk`)
 - Dev conveniences: `whop-dev-user-token`, tolerant webhook verifier
 
 ## Requirements
@@ -81,7 +81,7 @@ class ExperiencesController < ApplicationController
     user_id = whop_user_id
     exp_id = params[:experienceId] || params[:id]
     experience = begin
-      Whop.client.experiences.get(exp_id)
+      Whop.sdk.experiences.retrieve(exp_id)
     rescue StandardError
       { "id" => exp_id }
     end
@@ -133,48 +133,20 @@ If you prefer not to expose `WHOP_APP_ID` to the layout, add it to body:
 
 
 ```ruby
-# With app/company context from env
-Whop.client.users.get("user_xxx")
-Whop.client.experiences.get("exp_xxx")
-Whop.client.with_company("biz_xxx").companies.get("biz_xxx")
-
-# GraphQL (persisted operations)
-Whop.api.access.check_if_user_has_access_to_experience(userId: "user_xxx", experienceId: "exp_xxx")
+# Preferred REST SDK usage
 
 # Users
-Whop.api.users.get_current_user
-Whop.api.users.get_user(userId: "user_xxx")
-Whop.api.users.list_user_socials(userId: "user_xxx", first: 10)
-Whop.api.users.ban_user(input: { userId: "user_xxx", reason: "abuse" })
+user = Whop.sdk.users.retrieve("user_xxx")
 
-# Payments
-Whop.api.payments.create_checkout_session(input: { planId: "plan_xxx", successUrl: "https://...", cancelUrl: "https://..." })
-Whop.api.payments.charge_user(input: { userId: "user_xxx", amount: 1000, currency: "USD" })
-Whop.api.payments.list_receipts_for_company(companyId: "biz_xxx", first: 20)
+# Access check
+access = Whop.sdk.users.check_access("exp_xxx", id: "user_xxx")
+if access.has_access
+  # allow
+end
 
-# Invoices
-Whop.api.invoices.create_invoice(input: { companyId: "biz_xxx", memberId: "mem_xxx", planId: "plan_xxx" })
-Whop.api.invoices.get_invoice(invoiceId: "inv_xxx", companyId: "biz_xxx")
-
-# Promo Codes
-Whop.api.promo_codes.create_promo_code(input: { planId: "plan_xxx", code: "WELCOME10", percentOff: 10 })
-Whop.api.promo_codes.get_promo_code(code: "WELCOME10", planId: "plan_xxx")
-
-# Apps
-Whop.api.apps.create_app(input: { name: "My App" })
-Whop.api.apps.list_apps(first: 20)
-Whop.api.apps.create_app_build(input: { appId: "app_xxx", version: "1.0.0" })
-
-# Webhooks (server-only)
-Whop.api.webhooks.create_webhook(input: { url: "https://example.com/webhook", events: ["payment_succeeded"], apiVersion: "v2" })
-Whop.api.webhooks.list_webhooks(first: 20)
-
-# Messages
-Whop.api.messages.find_or_create_chat(input: { userId: "user_xxx" })
-Whop.api.messages.send_message_to_chat(experienceId: "exp_xxx", message: "Hello!")
-
-# Notifications
-Whop.api.notifications.send_push_notification(input: { userId: "user_xxx", title: "Hi", body: "Welcome" })
+# Experiences/Companies
+exp = Whop.sdk.experiences.retrieve("exp_xxx")
+biz = Whop.sdk.companies.retrieve("biz_xxx")
 ```
 
 ## Local preview in Whop

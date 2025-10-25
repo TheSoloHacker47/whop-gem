@@ -32,6 +32,7 @@ Gem::Specification.new do |spec|
   spec.add_dependency "rack",          ">= 2.2", "< 4.0"
   spec.add_dependency "json",          "~> 2.6"
   spec.add_dependency "jwt",           "~> 2.8"
+  spec.add_dependency "whop_sdk",      ">= 0.0.1"
 
   # Development dependencies
   spec.add_development_dependency "rspec", "~> 3.12"

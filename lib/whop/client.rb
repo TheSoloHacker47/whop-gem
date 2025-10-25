@@ -45,6 +45,7 @@ module Whop
 
     # GraphQL (persisted operations by operationName)
     def graphql(operation_name, variables = {})
+      warn "[whop] GraphQL is deprecated. Migrate to Whop.sdk (REST). Called: #{operation_name}"
       with_error_mapping do
         response = Faraday.post("#{config.api_base_url}/public-graphql") do |req|
           apply_common_headers(req.headers)
@@ -57,6 +58,7 @@ module Whop
 
     # GraphQL with inline query string (non-persisted). Useful when operationId is unavailable.
     def graphql_query(operation_name, query_string, variables = {})
+      warn "[whop] GraphQL is deprecated. Migrate to Whop.sdk (REST). Called: #{operation_name}"
       with_error_mapping do
         response = Faraday.post("#{config.api_base_url}/public-graphql") do |req|
           apply_common_headers(req.headers)
@@ -72,6 +74,7 @@ module Whop
     # Usage:
     #   Whop.client.graphql_each_page("listReceiptsForCompany", { companyId: "biz" }, path: ["company", "receipts"]) { |node| ... }
     def graphql_each_page(operation_name, variables, path:, first: 50, &block)
+      warn "[whop] GraphQL pagination is deprecated. Prefer REST/SDK pagination where available. Called: #{operation_name}"
       raise ArgumentError, "path must be an Array of keys" unless path.is_a?(Array) && !path.empty?
       cursor = nil
       loop do

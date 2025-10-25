@@ -70,9 +70,11 @@ module Whop
         return super unless spec
         case spec[:type]
         when :graphql
+          warn "[whop] DSL GraphQL call '#{name}' is deprecated. Use Whop.sdk.<resource> instead."
           variables = build_named_args(spec[:args], args, kwargs)
           @client.graphql(spec[:operation], variables)
         when :graphql_inline
+          warn "[whop] DSL GraphQL call '#{name}' is deprecated. Use Whop.sdk.<resource> instead."
           variables = build_named_args(spec[:args], args, kwargs)
           @client.graphql_query(spec[:operation], spec[:query], variables)
         when :rest_get

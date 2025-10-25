@@ -1,76 +1,32 @@
 module Whop
-  # Access helpers using persisted GraphQL operations per Whop docs
+  # Access helpers using REST via official Whop SDK
   class Access
-    def initialize(client)
-      @client = client
+    def initialize(_client)
+      # legacy argument retained for compatibility
     end
 
-    QUERY_EXPERIENCE = <<~GRAPHQL
-      query checkIfUserHasAccessToExperience($experienceId: ID!, $userId: ID) {
-        hasAccessToExperience(experienceId: $experienceId, userId: $userId) {
-          hasAccess
-          accessLevel
-        }
-      }
-    GRAPHQL
-
-    QUERY_ACCESS_PASS = <<~GRAPHQL
-      query checkIfUserHasAccessToAccessPass($accessPassId: ID!, $userId: ID) {
-        hasAccessToAccessPass(accessPassId: $accessPassId, userId: $userId) {
-          hasAccess
-          accessLevel
-        }
-      }
-    GRAPHQL
-
-    QUERY_COMPANY = <<~GRAPHQL
-      query checkIfUserHasAccessToCompany($companyId: ID!, $userId: ID) {
-        hasAccessToCompany(companyId: $companyId, userId: $userId) {
-          hasAccess
-          accessLevel
-        }
-      }
-    GRAPHQL
-
     def user_has_access_to_experience?(user_id:, experience_id:)
-      data = @client.graphql_query(
-        "checkIfUserHasAccessToExperience",
-        QUERY_EXPERIENCE,
-        { userId: user_id, experienceId: experience_id }
-      )
-      extract_access_boolean(data)
+      check_has_access(resource_id: experience_id, user_id: user_id)
     end
 
     def user_has_access_to_access_pass?(user_id:, access_pass_id:)
-      data = @client.graphql_query(
-        "checkIfUserHasAccessToAccessPass",
-        QUERY_ACCESS_PASS,
-        { userId: user_id, accessPassId: access_pass_id }
-      )
-      extract_access_boolean(data)
+      check_has_access(resource_id: access_pass_id, user_id: user_id)
     end
 
     def user_has_access_to_company?(user_id:, company_id:)
-      data = @client.graphql_query(
-        "checkIfUserHasAccessToCompany",
-        QUERY_COMPANY,
-        { userId: user_id, companyId: company_id }
-      )
-      extract_access_boolean(data)
+      check_has_access(resource_id: company_id, user_id: user_id)
     end
 
     private
 
-    def extract_access_boolean(graphql_result)
-      return false unless graphql_result.is_a?(Hash)
-      data = graphql_result["data"] || graphql_result
-      return false unless data.is_a?(Hash)
-
-      key = %w[hasAccessToExperience hasAccessToAccessPass hasAccessToCompany].find { |k| data.key?(k) rescue false }
-      payload = key ? data[key] : data
-
-      return payload["hasAccess"] if payload.is_a?(Hash) && payload.key?("hasAccess")
-      return payload if payload == true || payload == false
+    def check_has_access(resource_id:, user_id:)
+      resp = Whop.sdk.users.check_access(resource_id, id: user_id)
+      if resp.respond_to?(:has_access)
+        resp.has_access
+      else
+        (resp["has_access"] || resp[:has_access]) || false
+      end
+    rescue StandardError
       false
     end
   end

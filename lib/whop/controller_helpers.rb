@@ -41,11 +41,10 @@ module Whop
       uid
     end
 
-    # Convenience: fetch the current Whop user resource
-    # Uses REST to minimize coupling with GraphQL schema evolution
+    # Convenience: fetch the current Whop user resource via REST SDK
     def current_whop_user
       uid = require_whop_user!
-      Whop.client.users.get(uid)
+      Whop.sdk.users.retrieve(uid)
     rescue StandardError
       nil
     end
@@ -54,14 +53,16 @@ module Whop
       uid = whop_user_id
       raise Whop::Error, "Missing Whop user token" if uid.nil?
 
-      has_access = if experience_id
-        Whop.client.access.user_has_access_to_experience?(user_id: uid, experience_id: experience_id)
-      elsif access_pass_id
-        Whop.client.access.user_has_access_to_access_pass?(user_id: uid, access_pass_id: access_pass_id)
-      elsif company_id
-        Whop.client.access.user_has_access_to_company?(user_id: uid, company_id: company_id)
-      else
-        true
+      resource_id = experience_id || access_pass_id || company_id
+
+      has_access = true
+      if resource_id
+        resp = Whop.sdk.users.check_access(resource_id, id: uid)
+        has_access = if resp.respond_to?(:has_access)
+          resp.has_access
+        else
+          (resp["has_access"] || resp[:has_access])
+        end
       end
 
       render plain: "Forbidden", status: :forbidden unless has_access
