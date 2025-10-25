@@ -1,0 +1,206 @@
+# Whop Ruby Gem (Rails) — AI Context Overview
+
+This document gives AI agents a concise, high-signal overview of the Whop Ruby gem used to build Whop-embedded apps on Rails. It covers features, configuration, REST SDK usage, helpers, webhooks, generators, and migration notes.
+
+## Purpose
+- Build apps embedded inside Whop using Rails.
+- Verify Whop user tokens (JWT, ES256) and extract `user_id`.
+- Gate access to Experiences/Companies/Products via REST/SDK (GraphQL deprecated).
+- Prefer the official REST SDK client (`Whop.sdk`) for API calls.
+- Ship a webhooks engine with HMAC signature verification and generators.
+- Provide Rails scaffolds for common App Views (Experience, Company Dashboard, Discover).
+- Provide iframe SDK tags to initialize `window.iframeSdk` under CSP.
+
+## Interfaces (important)
+- Preferred: `Whop.sdk` → instance of `WhopSDK::Client` (official REST SDK).
+- Legacy: `Whop.client` → thin Faraday client with some REST helpers; retains GraphQL methods, now deprecated.
+- Legacy: `Whop.api` DSL → maps to GraphQL/REST; GraphQL entries are deprecated and emit warnings.
+
+## Requirements
+- Ruby 3.2+
+- Rails 7.0+ (Rails 8 supported)
+
+## Installation
+1) Gem + installer
+
+```ruby
+# Gemfile
+gem "whop", "~> 1.0"
+```
+
+```bash
+bundle install
+bin/rails g whop:install
+```
+
+Installer effects:
+- Creates `config/initializers/whop.rb` which reads env vars into `Whop.config`.
+- Creates `config/initializers/whop_iframe.rb` to allow embedding by Whop (CSP `frame-ancestors` for `*.whop.com` and removes `X-Frame-Options`).
+- Mounts `/whop/webhooks` for webhook ingestion.
+
+2) Environment variables (typical dev via dotenv)
+- `WHOP_APP_ID`
+- `WHOP_API_KEY`
+- `WHOP_WEBHOOK_SECRET`
+- Optional: `WHOP_AGENT_USER_ID`, `WHOP_COMPANY_ID` (legacy client context)
+- Optional: `WHOP_BASE_URL` (overrides REST SDK base URL; defaults to `https://api.whop.com/api/v1`)
+- Optional: `WHOP_API_BASE_URL` (legacy client; defaults to `https://api.whop.com`)
+
+Template: `config/initializers/whop.rb`
+```ruby
+Whop.configure do |config|
+  config.app_id         = ENV["WHOP_APP_ID"]
+  config.api_key        = ENV["WHOP_API_KEY"]
+  config.webhook_secret = ENV["WHOP_WEBHOOK_SECRET"]
+  config.agent_user_id  = ENV["WHOP_AGENT_USER_ID"]
+  config.company_id     = ENV["WHOP_COMPANY_ID"]
+  # config.api_base_url = "https://api.whop.com" # legacy client only
+end
+```
+
+## App Views (pages Whop loads in iframe)
+Configure in Whop dashboard (Hosting → App Views):
+- Experience View: `/experiences/[experienceId]`
+- Dashboard View: `/dashboard/[companyId]`
+- Discover View: `/discover`
+
+Generate scaffolded controllers/views with safe defaults:
+```bash
+bin/rails g whop:scaffold:all
+# or individually
+bin/rails g whop:scaffold:company
+bin/rails g whop:scaffold:experience
+```
+
+Scaffolds include access gating and resilient fetches (render even if early REST calls 404 during initial dev).
+
+## Controller helpers
+Include in controllers handling embedded routes:
+```ruby
+class ExperiencesController < ApplicationController
+  include Whop::ControllerHelpers
+  before_action -> { require_whop_access!(experience_id: params[:experienceId] || params[:id]) }
+
+  def show
+    user_id = whop_user_id
+    exp_id = params[:experienceId] || params[:id]
+    experience = begin
+      Whop.sdk.experiences.retrieve(exp_id) # prefer REST SDK
+    rescue StandardError
+      { "id" => exp_id }
+    end
+    render :show, locals: { user_id:, experience: }
+  end
+end
+```
+
+Key methods:
+- `whop_user_id` → returns current Whop `user_id` from a verified JWT header (`x-whop-user-token`). Validates JWT issuer and app audience.
+- `current_whop_user_id` → alias.
+- `require_whop_user!` → raises if no valid token present.
+- `current_whop_user` → REST fetch via `Whop.sdk.users.retrieve(uid)`; returns `nil` on failure.
+- `require_whop_access!(experience_id:, access_pass_id:, company_id:)` → guards by calling REST `Whop.sdk.users.check_access(resource_id, id: uid)`; renders 403 when false.
+
+Dev convenience:
+- In development only, supports `whop-dev-user-token` (header or query param). If value looks like a JWT, verifies it; otherwise treats it as a raw `user_id`.
+
+## Token verification
+- `Whop::Token.verify(headers)` expects `x-whop-user-token`, decodes ES256 JWT using embedded public key, enforces issuer and `aud` matching `WHOP_APP_ID`/`Whop.config.app_id`. Returns `{ "user_id" => sub }`.
+- `Whop::Token.verify_from_jwt(token)` → returns decoded JWT payload.
+
+## Webhooks
+- Engine mounts at `/whop/webhooks` (`Whop::Webhooks::Engine`).
+- Signature verification: HMAC-SHA256 over request body; header may be `hex` or `sha256=<hex>`.
+- Verifier tolerates canonicalized JSON to smooth dev formatting differences.
+
+Generate a handler job:
+```bash
+bin/rails g whop:webhooks:handler payment_succeeded
+```
+
+Local test example:
+```bash
+cat > payload.json <<'JSON'
+{ "action": "payment.succeeded", "data": { "id": "pay_123", "user_id": "user_123", "final_amount": 1000, "amount_after_fees": 950, "currency": "USD" } }
+JSON
+SIG=$(ruby -ropenssl -e 's=ENV.fetch("WHOP_WEBHOOK_SECRET"); p=File.read("payload.json"); puts "sha256=#{OpenSSL::HMAC.hexdigest("SHA256", s, p)}"')
+curl -i -X POST http://localhost:3000/whop/webhooks \
+  -H "Content-Type: application/json" \
+  -H "X-Whop-Signature: $SIG" \
+  --data-binary @payload.json
+```
+
+## Iframe SDK helper (frontend init)
+Render safe SDK tags in your layout head:
+```erb
+<%= extend(Whop::IframeHelper) && whop_iframe_sdk_tags %>
+```
+- Prefers UMD from `unpkg.com` and ESM fallback from `esm.sh`.
+- Initializes `window.iframeSdk` once, pulling `appId` from explicit arg, `ENV["WHOP_APP_ID"]`/`Whop.config.app_id`, or `document.body.dataset.whopAppId`.
+- Understands Rails CSP nonces and `turbo:load` event.
+
+Optional body attribute if not exposing ENV in head:
+```erb
+<body data-whop-app-id="<%= ENV['WHOP_APP_ID'] %>">
+```
+
+## API usage (preferred)
+Use the official REST SDK via `Whop.sdk`.
+
+```ruby
+# Initialized from Whop.config (app_id, api_key). You can override base_url via ENV["WHOP_BASE_URL"].
+
+# Users
+user = Whop.sdk.users.retrieve("user_xxx")
+
+# Access checks (returns a model with has_access/access_level)
+access = Whop.sdk.users.check_access("exp_xxx", id: "user_xxx")
+if access.has_access
+  # allow
+else
+  # forbid
+end
+
+# Companies/Experiences (example names; see SDK for full surface)
+company = Whop.sdk.companies.retrieve("biz_xxx")
+experience = Whop.sdk.experiences.retrieve("exp_xxx")
+
+# Payments (example)
+# page = Whop.sdk.payments.list(company_id: "biz_xxx")
+```
+
+## Legacy client (backwards compat)
+`Whop.client` remains for existing integrations. It exposes:
+- REST helpers: `get(path, params:)`, `post(path, json:)`.
+- Context headers: `Authorization: Bearer <api_key>`, optional `x-on-behalf-of`, optional `x-company-id`.
+- Minimal resources: `users.get`, `experiences.get`, `companies.get`.
+- GraphQL methods (`graphql`, `graphql_query`, `graphql_each_page`) now emit deprecation warnings. Prefer REST/SDK.
+
+## DSL (legacy)
+`Whop.api` previously provided a GraphQL-heavy DSL. Those entries now emit deprecation warnings. Prefer direct REST SDK via `Whop.sdk`.
+
+## Error handling
+- Network and TLS errors map to `APIConnectionError` / `APITimeoutError`.
+- HTTP 4xx/5xx raise typed `APIStatusError` subclasses (legacy client). The SDK raises its own typed errors.
+- Controller helpers raise `Whop::Error` for missing/invalid tokens; `require_whop_access!` responds 403 on denial.
+
+## REST / Auth references (for agents)
+- Base REST (public): `https://api.whop.com/api/v1` (Authorization: `Bearer <API_KEY>`)
+- App/Company endpoints (admin): `/v5/app/...`, `/v5/company/...` (Authorization: `Bearer <APP_API_KEY>`)
+- Access check (SDK): `users.check_access(resource_id, id: userId)`
+
+## Deprecations (v1.x)
+- GraphQL endpoints and GraphQL-based DSL are deprecated and will be removed in a future major release (v2.0). Use `Whop.sdk`.
+
+## Versioning
+- Add `gem "whop", "~> 1.0"` to stay on v1.x.
+- Current gem version: read from `Whop::VERSION`.
+
+## Notes for AI agents
+- Prefer `Whop.sdk` for all API operations.
+- Use `Whop::ControllerHelpers#require_whop_access!` for gating.
+- For iframe initialization, render `<%= whop_iframe_sdk_tags %>` and ensure CSP allows `unpkg.com`, `esm.sh`, and `*.whop.com` for script/connect/frame.
+- Webhook verification: HMAC-SHA256 over raw body with `WHOP_WEBHOOK_SECRET`; header may include `sha256=` prefix.
+
+## License
+MIT

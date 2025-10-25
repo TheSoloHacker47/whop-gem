@@ -1,5 +1,6 @@
 require "active_support"
 require "active_support/core_ext/module/attribute_accessors"
+require "whop_sdk"
 
 module Whop
   # Base error type for gem
@@ -26,6 +27,14 @@ module Whop
   def self.client
     require_relative "whop/client"
     @_client ||= Whop::Client.new(config)
+  end
+
+  def self.sdk
+    @_sdk ||= WhopSDK::Client.new(
+      api_key: (config.api_key || ENV["WHOP_API_KEY"]),
+      app_id:  (config.app_id  || ENV["WHOP_APP_ID"]),
+      base_url: ENV["WHOP_BASE_URL"]
+    )
   end
 
   def self.api
