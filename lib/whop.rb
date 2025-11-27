@@ -59,8 +59,7 @@ require_relative "whop/webhooks/signature"
 # Load controller helpers so apps can include Whop::ControllerHelpers
 require_relative "whop/token"
 require_relative "whop/controller_helpers"
+require_relative "whop/iframe_helper"
 
 # Load access helpers (used by specs and controller helpers)
 require_relative "whop/access"
-
-
