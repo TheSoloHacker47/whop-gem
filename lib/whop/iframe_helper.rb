@@ -74,5 +74,3 @@ module Whop
     end
   end
 end
-
-
